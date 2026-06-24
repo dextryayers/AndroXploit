@@ -1,4 +1,4 @@
-# 🛡️ AndroXploit Suite Android Framework
+# 🛡️ AndroXploit Android Framework Tools
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white" alt="Python">
@@ -71,62 +71,118 @@ The system uses a **four-layer architecture** where each layer has a distinct re
 ## 🔄 Flowchart
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'primaryColor': '#1a1a2e', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C3AED', 'lineColor': '#F59E0B', 'secondaryColor': '#006400', 'tertiaryColor': '#fff'}}}%%
+
 flowchart TB
-    subgraph Host["🏠 Host Machine"]
+    classDef host fill:#1E3A5F,stroke:#4A90D9,stroke-width:2px,color:#fff
+    classDef python fill:#3572A5,stroke:#B8D4F0,stroke-width:3px,color:#fff,font-weight:bold
+    classDef golang fill:#00ADD8,stroke:#9CF,stroke-width:3px,color:#fff,font-weight:bold
+    classDef bash fill:#4EAA25,stroke:#8CE07C,stroke-width:3px,color:#fff,font-weight:bold
+    classDef ndk fill:#3DDC84,stroke:#A5D6A7,stroke-width:3px,color:#000,font-weight:bold
+    classDef adb fill:#FF6B35,stroke:#FFAB91,stroke-width:3px,color:#fff,font-weight:bold
+    classDef engines fill:#7C3AED,stroke:#A78BFA,stroke-width:2px,color:#fff
+    classDef engine fill:#6D28D9,stroke:#C4B5FD,stroke-width:2px,color:#fff,font-size:12px
+    classDef data fill:#065F46,stroke:#6EE7B7,stroke-width:2px,color:#fff
+    classDef output fill:#92400E,stroke:#FCD34D,stroke-width:2px,color:#fff
+    classDef result fill:#1E40AF,stroke:#93C5FD,stroke-width:3px,color:#fff,font-weight:bold
+    classDef display fill:#7C2D12,stroke:#FDBA74,stroke-width:3px,color:#fff,font-weight:bold
+
+    START([🏁 START]):::host --> PYTHON
+
+    subgraph HOST["🏠  HOST MACHINE"]
         direction TB
-        PY["🐍 Python Extractor<br/>extractor.py"]
-        GO["🔷 Go Crawler<br/>ce_runner"]
-        BASH["📜 Bash Deploy<br/>ce_deploy.sh"]
-        NDK["📦 Android NDK<br/>aarch64-linux-android21-clang"]
-        RESULTS["📁 Extracted Data<br/>./ce_results/"]
+        PYTHON[🐍  Python Extractor\n extractor.py]:::python
+        GOLANG[🔷  Go Crawler\n ce_runner]:::golang
+        BASH_SCRIPT[📜  Bash Deploy\n ce_deploy.sh]:::bash
+        NDK_COMPILE[📦  NDK Compiler\n aarch64-linux-android21-clang]:::ndk
+        BINARIES>🗄️  20 ARM64 Binaries\n ~17KB each]:::host
     end
 
-    subgraph Device["📱 Android Device"]
+    subgraph DEVICE["📱  ANDROID DEVICE"]
         direction TB
-        ADB["🔌 ADB Daemon"]
-        C_ENGINES["⚡ 20 C Engines"]
-        OUTPUT["📂 /data/local/tmp/ce_results/"]
-        DATA["🗄️ System Files<br/>/data/, /proc/, /sdcard/"]
+        ADB_DAEMON[🔌  ADB Daemon]:::adb
+        C_ENGINES{⚡  20 Native C Engines\n /data/local/tmp/}:::engines
+        ENGINE_GRP[🔶  Engine Pool]:::engines
+        DATA_SRC[🗄️  System Data Sources\n /data/  •  /proc/  •  /sdcard/]:::data
+        OUTPUT_DIR[📂  Output Directory\n /data/local/tmp/ce_results/]:::output
     end
 
-    PY -->|"triggers"| BASH
-    PY -->|"triggers"| GO
-    BASH -->|"make all"| NDK
-    GO -->|"make all"| NDK
-    NDK -->|"20 ARM64 binaries"| C_ENGINES
-    
-    BASH -->|"adb push"| ADB
-    GO -->|"adb push (parallel)"| ADB
-    ADB -->|"deploy to /data/local/tmp/"| C_ENGINES
-    
-    C_ENGINES -->|"engine_01_imei"| DATA
-    C_ENGINES -->|"engine_02_contacts"| DATA
-    C_ENGINES -->|"engine_03_sms"| DATA
-    C_ENGINES -->|"engine_04_calllog"| DATA
-    C_ENGINES -->|"engine_05_wifi"| DATA
-    C_ENGINES -->|"engine_06_accounts"| DATA
-    C_ENGINES -->|"engine_07_whatsapp"| DATA
-    C_ENGINES -->|"engine_08_telegram"| DATA
-    C_ENGINES -->|"engine_09_browser"| DATA
-    C_ENGINES -->|"engine_10_system"| DATA
-    C_ENGINES -->|"engine_11_process"| DATA
-    C_ENGINES -->|"engine_12_network"| DATA
-    C_ENGINES -->|"engine_13_sqlite"| DATA
-    C_ENGINES -->|"engine_14_media"| DATA
-    C_ENGINES -->|"engine_15_files"| DATA
-    C_ENGINES -->|"engine_16_backup"| DATA
-    C_ENGINES -->|"engine_17_hidden"| DATA
-    C_ENGINES -->|"engine_18_device"| DATA
-    C_ENGINES -->|"engine_19_keystore"| DATA
-    C_ENGINES -->|"engine_20_master"| DATA
-    
-    C_ENGINES -->|"write results"| OUTPUT
-    ADB -->|"adb pull"| RESULTS
+    subgraph RESULTS_SECTION["📊  RESULTS"]
+        PULLED[📁  Pulled Results\n ./ce_results/]:::result
+        REPORT[📋  Aggregate Report\n ce_aggregate_report.json]:::result
+        DISPLAY[🖥️  Rich Summary Table\n Console Output]:::display
+    end
 
-    GO -->|"parallel execution<br/>(4 engines at once)"| ADB
-    
-    RESULTS -->|"aggregate report"| PY
-    PY -->|"rich console output"| DISPLAY["🖥️ Summary Table"]
+    PYTHON -->|"triggers deployment"| BASH_SCRIPT
+    PYTHON -->|"triggers parallel"| GOLANG
+
+    BASH_SCRIPT -->|"make all"| NDK_COMPILE
+    GOLANG -->|"make all"| NDK_COMPILE
+
+    NDK_COMPILE -->|"produces"| BINARIES
+
+    BINARIES -->|"adb push (20 files)"| ADB_DAEMON
+    GOLANG -->|"parallel exec\n(semaphore=4)"| ADB_DAEMON
+
+    ADB_DAEMON -->|"deploy to"| C_ENGINES
+
+    C_ENGINES -->|"orchstrates"| ENGINE_GRP
+
+    ENGINE_GRP --> engine_01[⚡ 01 IMEI\n IMEI/MEID/Serial]:::engine
+    ENGINE_GRP --> engine_02[⚡ 02 Contacts\n Address Book]:::engine
+    ENGINE_GRP --> engine_03[⚡ 03 SMS\n Text Messages]:::engine
+    ENGINE_GRP --> engine_04[⚡ 04 Call Log\n Call History]:::engine
+    ENGINE_GRP --> engine_05[⚡ 05 WiFi\n Credentials]:::engine
+    ENGINE_GRP --> engine_06[⚡ 06 Accounts\n Tokens]:::engine
+    ENGINE_GRP --> engine_07[⚡ 07 WhatsApp\n Chats]:::engine
+    ENGINE_GRP --> engine_08[⚡ 08 Telegram\n Messages]:::engine
+    ENGINE_GRP --> engine_09[⚡ 09 Browser\n History/Cookies]:::engine
+    ENGINE_GRP --> engine_10[⚡ 10 System\n Config]:::engine
+    ENGINE_GRP --> engine_11[⚡ 11 Process\n Memory]:::engine
+    ENGINE_GRP --> engine_12[⚡ 12 Network\n Connections]:::engine
+    ENGINE_GRP --> engine_13[⚡ 13 SQLite\n All DBs]:::engine
+    ENGINE_GRP --> engine_14[⚡ 14 Media\n Photos/Videos]:::engine
+    ENGINE_GRP --> engine_15[⚡ 15 Files\n Full Index]:::engine
+    ENGINE_GRP --> engine_16[⚡ 16 Backup\n Archive]:::engine
+    ENGINE_GRP --> engine_17[⚡ 17 Hidden\n Secrets]:::engine
+    ENGINE_GRP --> engine_18[⚡ 18 Device\n Hardware]:::engine
+    ENGINE_GRP --> engine_19[⚡ 19 Keystore\n Credentials]:::engine
+    ENGINE_GRP --> engine_20[⚡ 20 Master\n Aggregator]:::engine
+
+    engine_01 --> DATA_SRC
+    engine_02 --> DATA_SRC
+    engine_03 --> DATA_SRC
+    engine_04 --> DATA_SRC
+    engine_05 --> DATA_SRC
+    engine_06 --> DATA_SRC
+    engine_07 --> DATA_SRC
+    engine_08 --> DATA_SRC
+    engine_09 --> DATA_SRC
+    engine_10 --> DATA_SRC
+    engine_11 --> DATA_SRC
+    engine_12 --> DATA_SRC
+    engine_13 --> DATA_SRC
+    engine_14 --> DATA_SRC
+    engine_15 --> DATA_SRC
+    engine_16 --> DATA_SRC
+    engine_17 --> DATA_SRC
+    engine_18 --> DATA_SRC
+    engine_19 --> DATA_SRC
+    engine_20 --> DATA_SRC
+
+    DATA_SRC -->|"read system data"| OUTPUT_DIR
+    C_ENGINES -->|"write JSON results"| OUTPUT_DIR
+    engine_20 -->|"aggregates all 19"| OUTPUT_DIR
+
+    ADB_DAEMON -->|"adb pull"| PULLED
+    OUTPUT_DIR -->|"adb pull"| PULLED
+
+    PULLED -->|"json parse"| REPORT
+    REPORT -->|"render"| DISPLAY
+
+    DISPLAY --> END([✅  COMPLETE]):::display
+
+    linkStyle default stroke:#F59E0B,stroke-width:2px
 ```
 
 ### Execution Timeline
