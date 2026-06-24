@@ -71,112 +71,102 @@ The system uses a **four-layer architecture** where each layer has a distinct re
 ## 🔄 Flowchart
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'primaryColor': '#ffffff', 'primaryTextColor': '#1a1a2e', 'primaryBorderColor': '#334155', 'lineColor': '#475569', 'secondaryColor': '#f8fafc', 'tertiaryColor': '#ffffff', 'fontSize': '13px'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#ffffff',
+  'primaryColor': '#ffffff',
+  'primaryTextColor': '#1e293b',
+  'primaryBorderColor': '#334155',
+  'lineColor': '#475569',
+  'secondaryColor': '#f1f5f9',
+  'tertiaryColor': '#f8fafc',
+  'fontSize': '14px'
+}}}%%
 
 flowchart TB
-    classDef phase fill:#ffffff,stroke:#334155,stroke-width:2px,color:#1a1a2e
-    classDef process fill:#f8fafc,stroke:#475569,stroke-width:1.5px,color:#1e293b
-    classDef decision fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#854d0e
-    classDef sub fill:#f1f5f9,stroke:#94a3b8,stroke-width:1px,color:#334155,font-size:11px
-    classDef engine fill:#eef2ff,stroke:#6366f1,stroke-width:1.5px,color:#4338ca,font-size:11px
-    classDef data fill:#f0fdf4,stroke:#22c55e,stroke-width:1.5px,color:#166534
-    classDef output fill:#fef2f2,stroke:#ef4444,stroke-width:1.5px,color:#991b1b
-    classDef terminal fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#ffffff,font-weight:bold
+    classDef phdr fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#ffffff,font-weight:bold,font-size:13px
+    classDef step fill:#ffffff,stroke:#334155,stroke-width:2px,color:#1e293b,font-size:13px
+    classDef sub fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#334155,font-size:12px
+    classDef dec fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#854d0e,font-size:13px,font-weight:bold
+    classDef eng fill:#eef2ff,stroke:#6366f1,stroke-width:1.5px,color:#4338ca,font-size:12px
+    classDef data fill:#f0fdf4,stroke:#22c55e,stroke-width:1.5px,color:#166534,font-size:12px
+    classDef out fill:#fef2f2,stroke:#ef4444,stroke-width:1.5px,color:#991b1b,font-size:12px
+    classDef term fill:#1e293b,stroke:#0f172a,stroke-width:3px,color:#ffffff,font-weight:bold,font-size:14px
 
-    START([ START ]):::terminal
-    ENDD([ END ]):::terminal
+    START([⏩  S T A R T]):::term
+    FIN([⏹  E N D]):::term
 
-    subgraph PHASE1["PHASE 1 — Initiation"]
-        direction TB
-        P1[1. Python Module Loader\n extractor.py]:::phase
-        P2[2. Resolve ADB Device\n auto-detect / manual serial]:::process
-        P3{3. Device Connected?}:::decision
-        P4[4. Gather Device Info\n model • android • kernel • rooted]:::process
-        P5[5. Build Phase List\n 11 enabled categories]:::process
-    end
+    P1["1. Python Module Loader<br/>extractor.py — orchestrates all phases"]:::step
+    P2["2. Resolve ADB Device<br/>auto-detect or manual serial number"]:::step
+    P3{"3. Device Connected?"}:::dec
+    P4["4. Gather Device Info<br/>model • android • kernel • build • rooted"]:::step
+    P5["5. Build Enabled Phase List<br/>11 categories from PHASE_CONFIG"]:::step
+    P6["6. Locate C Engine Sources<br/>c_engines/engines/engine_*.c (20 files)"]:::step
+    P7{"7. NDK Available?<br/>ANDROID_NDK_HOME set?"}:::dec
+    P8["8a. ARM64 Cross-Compile<br/>aarch64-linux-android21-clang -Os -fPIE -static"]:::step
+    P9["8b. Fallback: Host Build<br/>gcc -Os -Wall -DTARGET_HOST"]:::sub
+    P10["9. Verify 20 Binaries<br/>~17KB each, statically linked"]:::step
+    P11["10. Push to Device<br/>adb push → /data/local/tmp/"]:::step
+    P12["11. Create Remote Output Dir<br/>mkdir /data/local/tmp/ce_results/"]:::step
+    P13["12. Launch Engine Pool<br/>parallel = 4 concurrent engines"]:::step
 
-    subgraph PHASE2["PHASE 2 — C Engine Preparation"]
-        direction TB
-        P6[6. Locate C Engine Sources\n c_engines/engines/*.c]:::process
-        P7{7. NDK Available?}:::decision
-        P8[8a. Cross-compile ARM64\n aarch64-linux-android21-clang -Os -fPIE -static]:::process
-        P9[8b. Fallback: Host Build\n gcc -Os -Wall -DTARGET_HOST]:::process
-        P10[9. Verify 20 Binaries\n ~17KB each]:::process
-        P11[10. Push to Device\n adb push → /data/local/tmp/]:::process
-    end
+    P14["13. Engines Access Data Sources<br/>system files • content providers • service calls • /proc/"]:::data
+    P15["14. Engines Write Results<br/>JSON metadata + raw data files → ce_results/"]:::out
+    P16["15. adb pull Results to Host<br/>ce_results/ → ./extracted_data/"]:::out
+    P17["16. Cleanup Device<br/>rm -rf /data/local/tmp/ce_results/"]:::step
+    P18["17. Aggregate All Engine Outputs<br/>parse JSON • count files • sum sizes"]:::step
+    P19["18. Generate Report Files<br/>ce_aggregate_report.json • ce_summary.txt • file index"]:::step
+    P20["19. Render Console Summary<br/>Rich Table • per-phase stats • total size • duration"]:::step
 
-    subgraph PHASE3["PHASE 3 — Execution (Parallel=4)"]
-        direction TB
-        P12[11. Create Output Dir\n adb shell mkdir /data/local/tmp/ce_results/]:::process
-        P13[12. Launch Engine Pool\n semaphore = 4 concurrent]:::process
-
-        subgraph ENGINES["20 Engines"]
-            direction TB
-            E01[01 IMEI\n Device IDs]:::engine
-            E02[02 Contacts\n Address Book]:::engine
-            E03[03 SMS\n Messages]:::engine
-            E04[04 Call Log\n History]:::engine
-            E05[05 WiFi\n Credentials]:::engine
-            E06[06 Accounts\n Tokens]:::engine
-            E07[07 WhatsApp\n Chats]:::engine
-            E08[08 Telegram\n Messages]:::engine
-            E09[09 Browser\n 15 browsers]:::engine
-            E10[10 System\n Config]:::engine
-            E11[11 Process\n Memory]:::engine
-            E12[12 Network\n Connections]:::engine
-            E13[13 SQLite\n All DBs]:::engine
-            E14[14 Media\n Photos/Video]:::engine
-            E15[15 Files\n Index]:::engine
-            E16[16 Backup\n Archive]:::engine
-            E17[17 Hidden\n Secrets]:::engine
-            E18[18 Device\n Hardware]:::engine
-            E19[19 Keystore\n Credentials]:::engine
-            E20[20 Master\n Aggregator]:::engine
-        end
-
-        P14[13. Engines Access Data Sources\n shell • content • service • root fallback]:::data
-        P15[14. Engines Write Results\n JSON + raw files → ce_results/]:::output
-    end
-
-    subgraph PHASE4["PHASE 4 — Retrieval"]
-        direction TB
-        P16[15. adb pull Results\n ce_results/ → host]:::output
-        P17[16. Cleanup Device\n rm -rf /data/local/tmp/ce_results/]:::process
-    end
-
-    subgraph PHASE5["PHASE 5 — Reporting"]
-        direction TB
-        P18[17. Aggregate Engine Outputs\n parse JSON • count files • sum sizes]:::process
-        P19[18. Generate Reports\n JSON report • TXT summary • file index]:::process
-        P20[19. Render Console Summary\n Rich Table • per-phase stats • total]:::process
+    subgraph E["20 C ENGINES — each reads system data, writes to ce_results/"]
+        direction LR
+        E01["⚙ 01 IMEI"]:::eng
+        E02["⚙ 02 Contacts"]:::eng
+        E03["⚙ 03 SMS"]:::eng
+        E04["⚙ 04 Call Log"]:::eng
+        E05["⚙ 05 WiFi"]:::eng
+        E06["⚙ 06 Accounts"]:::eng
+        E07["⚙ 07 WhatsApp"]:::eng
+        E08["⚙ 08 Telegram"]:::eng
+        E09["⚙ 09 Browser"]:::eng
+        E10["⚙ 10 System"]:::eng
+        E11["⚙ 11 Process"]:::eng
+        E12["⚙ 12 Network"]:::eng
+        E13["⚙ 13 SQLite"]:::eng
+        E14["⚙ 14 Media"]:::eng
+        E15["⚙ 15 Files"]:::eng
+        E16["⚙ 16 Backup"]:::eng
+        E17["⚙ 17 Hidden"]:::eng
+        E18["⚙ 18 Device"]:::eng
+        E19["⚙ 19 Keystore"]:::eng
+        E20["⚙ 20 Master"]:::eng
     end
 
     START --> P1
     P1 --> P2
     P2 --> P3
-    P3 -->|"Yes"| P4
-    P3 -->|"No"| P3
+    P3 -->|Yes| P4
+    P3 -->|No — retry 90s| P3
     P4 --> P5
     P5 --> P6
     P6 --> P7
-    P7 -->|"Yes (ANDROID_NDK_HOME)"| P8
-    P7 -->|"No"| P9
+    P7 -->|Yes| P8
+    P7 -->|No| P9
     P8 --> P10
     P9 --> P10
     P10 --> P11
     P11 --> P12
     P12 --> P13
-    P13 --> ENGINES
-    ENGINES --> P14
+    P13 --> E
+    E --> P14
     P14 --> P15
     P15 --> P16
     P16 --> P17
     P17 --> P18
     P18 --> P19
     P19 --> P20
-    P20 --> ENDD
+    P20 --> FIN
 
-    linkStyle default stroke:#64748b,stroke-width:1.5px
+    linkStyle default stroke:#64748b,stroke-width:2px
 ```
 
 ### Execution Timeline
