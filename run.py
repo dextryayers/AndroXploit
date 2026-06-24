@@ -2,19 +2,13 @@
 import os
 import sys
 import subprocess
-import shutil
+import time
 
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
 VENV_DIR = os.path.join(project_root, ".venv")
 VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python3")
-HISTORY_FILE = os.path.expanduser("~/.androxploit_history")
-
-
-def clear_history():
-    if os.path.exists(HISTORY_FILE):
-        os.remove(HISTORY_FILE)
 
 
 def is_in_venv():
@@ -23,7 +17,7 @@ def is_in_venv():
 
 def ensure_deps():
     missing = []
-    for mod in ["yaspin", "rich", "prompt_toolkit", "pyfiglet"]:
+    for mod in ["rich", "prompt_toolkit"]:
         try:
             __import__(mod)
         except ImportError:
@@ -51,7 +45,6 @@ def auto_activate_venv():
 def main():
     auto_activate_venv()
     ensure_deps()
-    clear_history()
 
     from core.animator import UFOAnimator
     UFOAnimator().fly()

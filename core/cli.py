@@ -22,14 +22,13 @@ from rich.live import Live
 from rich.rule import Rule
 
 from .banner import Banner
-from .animator import Animator, LiveProgress, AnimatedStatus
+from .animator import Animator, LiveProgress
 from .module_loader import ModuleLoader
 from .session import SessionManager
 from .database import Database
 from .reporter import ReportGenerator
 
 console = Console()
-status = AnimatedStatus()
 
 HISTORY_PATH = os.path.expanduser("~/.androxploit_history")
 os.makedirs(os.path.dirname(HISTORY_PATH), exist_ok=True)
@@ -41,15 +40,15 @@ HELP_TEXT = """
       exit / quit                    Exit AndroXploit
       clear                          Clear the terminal
 
-    [bold green]MODULES[/bold green]
-      show modules [cat]             List all weapons by category
-      show options                   Show active weapon options
-      use <module>                   Select a weapon to deploy
+    [bold green]ANDROID SCANNER[/bold green]
+      show modules [cat]             List available scan tools by category
+      use <module>                   Select a scan tool
+      show options                   Show active module options
       set <opt> <value>              Set a module option
-      run / execute                  Deploy the selected weapon
-      back                           Deselect current weapon
+      run / execute                  Run the selected scan tool
+      back                           Deselect current module
       info                           Show module details
-      search <term>                  Search available modules
+      search <term>                  Search available tools
 
     [bold green]SESSION & REPORT[/bold green]
       sessions                       List saved sessions
@@ -249,11 +248,7 @@ class AndroXploitCLI:
         if not self.current_module:
             console.print("  [bold red]\u2718[/bold red] No module selected. Use [green]use <module>[/green] first.")
             return
-        missing = []
-        if hasattr(self.current_module, "options"):
-            for opt_name, opt_data in self.current_module.options.items():
-                if opt_data.get("required", False) and not opt_data.get("value"):
-                    missing.append(opt_name)
+        missing = self.current_module.validate_options()
         if missing:
             console.print(f"  [bold red]\u2718[/bold red] Required options: [bold yellow]{', '.join(missing)}[/bold yellow]")
             console.print(f"  [dim]Use: set <OPTION> <value>[/dim]")

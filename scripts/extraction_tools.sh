@@ -3,6 +3,11 @@ set -euo pipefail
 IFS=$'\n\t'
 
 VERSION="3.0.0"
+JSON_MODE=false
+STATE_FILE=""
+RESUME_MODE=false
+DEVICE_SERIAL=""
+ADB_BASE="adb"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BLUE='\033[0;34m'; MAGENTA='\033[0;35m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
@@ -14,6 +19,17 @@ log_section() { echo -e "\n${BLUE}═══════════════�
 log_progress() { echo -ne "${DIM}  → $1...${NC}"; }
 log_done()    { echo -e "\r  ${GREEN}✓${NC} ${DIM}$1${NC}"; }
 log_fail()    { echo -e "\r  ${RED}✗${NC} ${DIM}$1${NC}"; }
+
+if [[ "$JSON_MODE" == "true" ]]; then
+    log_info()  { echo "{\"level\":\"info\",\"message\":\"$1\"}"; }
+    log_ok()    { echo "{\"level\":\"ok\",\"message\":\"$1\"}"; }
+    log_warn()  { echo "{\"level\":\"warn\",\"message\":\"$1\"}"; }
+    log_err()   { echo "{\"level\":\"error\",\"message\":\"$1\"}"; }
+    log_section() { echo "{\"event\":\"section\",\"name\":\"$1\"}"; }
+    log_progress() { :; }
+    log_done()    { :; }
+    log_fail()    { :; }
+fi
 
 OUT_DIR="output/extracted"
 mkdir -p "$OUT_DIR"/{apks,data,sms,contacts,call_log,accounts,wifi,browser,media,clipboard}
@@ -425,21 +441,42 @@ cmd_all() {
     local start; start=$(date +%s)
 
     echo; log_info "Phase 1: Communications"
-    cmd_sms >/dev/null 2>&1; cmd_mms >/dev/null 2>&1; cmd_contacts >/dev/null 2>&1; cmd_call_log >/dev/null 2>&1
+    run_extract_phase "sms" "cmd_sms >/dev/null 2>&1 || true"
+    run_extract_phase "mms" "cmd_mms >/dev/null 2>&1 || true"
+    run_extract_phase "contacts" "cmd_contacts >/dev/null 2>&1 || true"
+    run_extract_phase "call_log" "cmd_call_log >/dev/null 2>&1 || true"
+    mark_extract_completed "communications"
 
     echo; log_info "Phase 2: Accounts & Auth"
-    cmd_accounts >/dev/null 2>&1; cmd_tokens >/dev/null 2>&1; cmd_wifi >/dev/null 2>&1; cmd_browser >/dev/null 2>&1; cmd_clipboard >/dev/null 2>&1
+    run_extract_phase "accounts" "cmd_accounts >/dev/null 2>&1 || true"
+    run_extract_phase "tokens" "cmd_tokens >/dev/null 2>&1 || true"
+    run_extract_phase "wifi" "cmd_wifi >/dev/null 2>&1 || true"
+    run_extract_phase "browser" "cmd_browser >/dev/null 2>&1 || true"
+    run_extract_phase "clipboard" "cmd_clipboard >/dev/null 2>&1 || true"
+    mark_extract_completed "accounts_auth"
 
     echo; log_info "Phase 3: System"
-    cmd_system_info >/dev/null 2>&1; cmd_logs >/dev/null 2>&1; cmd_settings >/dev/null 2>&1
+    run_extract_phase "system_info" "cmd_system_info >/dev/null 2>&1 || true"
+    run_extract_phase "logs" "cmd_logs >/dev/null 2>&1 || true"
+    run_extract_phase "settings" "cmd_settings >/dev/null 2>&1 || true"
+    mark_extract_completed "system"
 
-    echo; log_info "Phase 4: APKs (first 20 system + all third-party)"
-    cmd_apk_thirdparty >/dev/null 2>&1 || true
+    echo; log_info "Phase 4: APKs"
+    run_extract_phase "apks" "cmd_apk_thirdparty >/dev/null 2>&1 || true"
+    mark_extract_completed "apks"
 
     local end; end=$(date +%s)
     echo
     log_ok "Extraction pipeline complete ($((end-start))s)"
     cmd_summary
+
+    if [[ -n "$STATE_FILE" ]]; then
+        rm -f "$STATE_FILE"
+    fi
+
+    if [[ "$JSON_MODE" == "true" ]]; then
+        echo "{\"event\":\"complete\",\"duration\":$((end-start)),\"output_dir\":\"$OUT_DIR\"}"
+    fi
 }
 
 cmd_summary() {
@@ -473,9 +510,69 @@ cmd_categorize() {
     done
 }
 
+# ─── ARGUMENT PARSING / JSON / STATE FILE ─────────────────────
+
+parse_extract_args() {
+    local -a pos
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json) JSON_MODE=true; shift ;;
+            --state-file) STATE_FILE="$2"; shift 2 ;;
+            --resume) RESUME_MODE=true; shift ;;
+            --device) DEVICE_SERIAL="$2"; ADB_BASE="adb -s $DEVICE_SERIAL"; shift 2 ;;
+            --output) OUT_DIR="$2"; shift 2 ;;
+            *) pos+=("$1"); shift ;;
+        esac
+    done
+    if [[ "$RESUME_MODE" == "true" && -z "$STATE_FILE" ]]; then
+        STATE_FILE="${OUT_DIR}/.extract_state"
+    fi
+    mkdir -p "$OUT_DIR"
+    # Re-emit remaining args
+    echo "${pos[@]}"
+}
+
+mark_extract_completed() {
+    local phase="$1"
+    if [[ -n "$STATE_FILE" ]]; then
+        mkdir -p "$(dirname "$STATE_FILE")"
+        echo "$phase completed $(date +%s)" >> "$STATE_FILE"
+    fi
+    if [[ "$JSON_MODE" == "true" ]]; then
+        echo "{\"event\":\"phase_complete\",\"phase\":\"$phase\"}"
+    fi
+}
+
+is_extract_completed() {
+    local phase="$1"
+    if [[ -z "$STATE_FILE" || ! -f "$STATE_FILE" ]]; then
+        return 1
+    fi
+    grep -q "^$phase " "$STATE_FILE" 2>/dev/null && return 0
+    return 1
+}
+
+run_extract_phase() {
+    local name="$1" func="$2"
+    if is_extract_completed "$name"; then
+        log_info "Phase '$name' already completed — skipping"
+        return 0
+    fi
+    $func
+    mark_extract_completed "$name"
+}
+
 # ─── MAIN ────────────────────────────────────────────────────
 
 main() {
+    local remaining
+    remaining=$(parse_extract_args "$@")
+    eval set -- "$remaining"
+
+    if [[ "$JSON_MODE" == "true" ]]; then
+        echo "{\"event\":\"start\",\"tool\":\"extraction_tools\",\"version\":\"$VERSION\"}"
+    fi
+
     [[ $# -lt 1 ]] && { show_help; exit 0; }
     local cmd="$1"; shift
 

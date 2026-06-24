@@ -60,7 +60,7 @@ class ModuleLoader:
 
     def show_modules_table(self, category=None):
         table = Table(
-            title="[bold green]Available Weapons[/bold green]",
+            title="[bold green]Android Scan Tools[/bold green]",
             border_style="green",
             header_style="bold yellow",
             title_style="bold green",
